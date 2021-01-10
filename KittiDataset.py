@@ -151,8 +151,7 @@ class KittiDataset(Dataset):
         for label in labels:
             bbox_2d = label["bbox_2d"]
             bbox_3d = label["bbox_3d"]
-            class_name = label["class_name"]
-            # class_score = label["class_score"]
+            label_id = class_name_to_label(label["class_name"])
 
             pos_3d = bbox_3d[0]
             dims_3d = bbox_3d[1]
@@ -161,12 +160,13 @@ class KittiDataset(Dataset):
             bbox_3d = BBox3D(*pos_3d, *dims_3d, rotation)        
             bbox_2d = BBox2D(bbox_2d)
 
-            kitti_object =  KittiObject(bbox_3d=bbox_3d, class_name=class_name, label_dict=label, bbox_2d=bbox_2d) 
-            kitti_object.is_label = True
+            # coordinates in dataset is camera rect 3D unlike the model output (lidar coord)
+            bbox_3d.coordinates = Coordinates.CAM_3D_RECT
+
+            kitti_object =  KittiObject(bbox_3d=bbox_3d, label=label_id, bbox_2d=bbox_2d) 
             kitti_labels.append(kitti_object)
 
         return kitti_labels
-
 
 
 # KITTI = KittiDataset()

@@ -1,5 +1,5 @@
 import numpy as np
-
+from enum import Enum
 # ================================================
 class BBox2D:
     def __init__(self, bbox):
@@ -20,29 +20,22 @@ class BBox3D:
         self.width  = w # y length 10 
         self.length = l # x length 50
         self.rotation = rotation
+        # default coordinates .. same as model output
+        self.coordinates = Coordinates.LIDAR
+
+class Coordinates(Enum):
+    CAM_3D_RECT = 0
+    CAM_3D_REF = 1
+    LIDAR = 2
+
 # ================================================
-
 class KittiObject:
-    def __init__(self, bbox_3d, class_name, label_dict, score=1, bbox_2d=None):
+    def __init__(self, bbox_3d, label, score=1, bbox_2d=None):
         self.bbox_3d = bbox_3d
-        self.name = class_name
+        self.label = label
         self.score = score
-        self.dict = label_dict
         self.bbox_2d = bbox_2d
-        self.id = self.encode_classname(self.name)
-        self.is_label = False
 
-    def encode_classname(self, classname):
-        class_to_id = {
-            'Car': 0,
-            'Van': 0,
-            'Truck': 0,
-            'Pedestrian': 1,
-            'Person_sitting': 1,
-            'Cyclist': 2
-        }
-
-        return class_to_id[classname]
 
 # ================================================
 class KittiCalibration:
@@ -112,3 +105,52 @@ class KittiCalibration:
 
         return points_3d_velodyne.T
 
+
+
+
+
+
+# ================================================
+def class_name_to_label(classname):
+    class_to_label = {
+        'Car': 0,
+        'Van': 0,
+        'Truck': 0,
+        'Pedestrian': 1,
+        'Person_sitting': 1,
+        'Cyclist': 2
+    }
+    return class_to_label[classname]
+
+def label_to_class_name(label):
+    class_list = ["Car", "Pedestrian", "Cyclist"]
+    return class_list[label]
+
+def model_output_to_kitti_objects(pred_dict):
+    kitti_objects = []
+    
+    # tensor
+    boxes  = pred_dict[0]["pred_boxes"]
+    scores = pred_dict[0]["pred_scores"]
+    labels = pred_dict[0]["pred_labels"]
+
+    # convert cuda tensor to numpy array / list
+    boxes  = boxes.cpu().numpy()
+    scores = scores.cpu().numpy().tolist()
+    labels = labels.cpu().numpy().tolist()
+
+    n_objects = boxes.shape[0]
+
+    for i in range(n_objects):
+        # bbox .. x,y,z, dx,dy,dz, rotation
+        x, y, z, w, l, h, rot = boxes[i].tolist()
+        bbox = BBox3D(x, y, z, h, w, l, rot)
+        # score
+        score = scores[i]
+        # label index is shifted in model output
+        label_id = labels[i] - 1
+
+        kitti_object = KittiObject(bbox, label_id)
+        kitti_objects.append(kitti_object)
+
+    return kitti_objects
