@@ -16,9 +16,9 @@ class BBox3D:
         self.x = x
         self.y = y
         self.z = z
-        self.height = h # z length
-        self.width  = w # y length
-        self.length = l # x length
+        self.height = h # z length 20
+        self.width  = w # y length 10 
+        self.length = l # x length 50
         self.rotation = rotation
 # ================================================
 
@@ -36,7 +36,7 @@ class KittiObject:
         class_to_id = {
             'Car': 0,
             'Van': 0,
-            'Trunk': 0,
+            'Truck': 0,
             'Pedestrian': 1,
             'Person_sitting': 1,
             'Cyclist': 2
@@ -62,9 +62,8 @@ class KittiCalibration:
         # rectification rotation matrix 3x3
         self.R0_rect = np.asarray(calib_dict["R0_rect"]).reshape(3,3)
         # Extrensic Transilation-Rotation Matrix from LIDAR to Cam ref(before rectification) 
-        # Composed of 3x3 Rotation & a column of 3x1 Transilation
         self.Tr_velo_to_cam = np.asarray(calib_dict["Tr_velo_to_cam"]).reshape(3,4)
-
+        # inverse of Tr_velo_cam
         self.Tr_cam_to_velo = self.inverse_Tr(self.Tr_velo_to_cam)
 
     def inverse_Tr(self, T):
@@ -100,22 +99,11 @@ class KittiCalibration:
             return: 
                 numpy array (N, 3) in velo coord.
         """
-        # # add 1 homogenious to all points .. (N, 4)
-        # points = np.hstack(( points, np.ones((points.shape[0],1), dtype=np.float) ))
-        # # convert T velo_cam_ref matrix to 4x4 by adding 0 0 0 1 vector @ bottom ... to take the inverse
-        # T_homogenious = np.vstack( (self.Tr_velo_to_cam, np.array([0, 0, 0, 1])) )
-        # # inverse of cam to rect === rect_to_cam
-        # R_homoginous = np.linalg.inv(self.R0_rect)
-        # ### convert R_homoginous to homogenious ... from 3x3 to 4x4
-        # R_homoginous = np.hstack( (R_homoginous, np.zeros((R_homoginous.shape[0], 1), dtype=np.float)) )
-        # R_homoginous = np.vstack( (R_homoginous, np.array([0, 0, 0, 1])))
-        # # inverse of T velo_cam_ref === T_cam_velo
-        # T_rectified_cam_to_velo = np.linalg.inv(np.dot(R_homoginous, T_homogenious).T)
-        # points_3d_velodyne = np.dot(points, T_rectified_cam_to_velo)
 
-        # from rectified cam to ref cam
+        # from rectified cam to ref cam 3d
         R_rect_inv = np.linalg.inv(self.R0_rect)
         points_ref =  np.dot(R_rect_inv, points.T) # 3xN
+
         # add homogenious 4xN
         points_ref = np.vstack((points_ref, np.ones((1, points_ref.shape[1]), dtype=np.float)))
 
@@ -123,5 +111,4 @@ class KittiCalibration:
         points_3d_velodyne = np.dot(self.Tr_cam_to_velo, points_ref)
 
         return points_3d_velodyne.T
-
 

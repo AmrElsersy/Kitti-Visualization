@@ -90,7 +90,7 @@ class KittiDataset(Dataset):
             bbox_2d = annotations[4:8] 
             # 3D Dims height - width - length ... 3D Camera Coordinates (height(z), width(y), length(x))
             bbox_3d_dims = annotations[8:11] 
-            # 3D Position in 3D Camera Coordinates (x,y,z)
+            # 3D Position in 3D Camera rectified Coordinates (x,y,z) (center of object)
             bbox_3d_pos = annotations[11:14] 
             # Rotation ry around Y-axis in camera coordinates [-pi..pi]
             rotation_y = annotations[14] 
@@ -169,7 +169,7 @@ class KittiDataset(Dataset):
 
 
 
-KITTI = KittiDataset()
+# KITTI = KittiDataset()
 # _, pointcloud, label, calib = KITTI[1]
 # print(pointcloud.shape)
 # print(label)

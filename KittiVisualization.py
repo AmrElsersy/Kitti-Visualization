@@ -9,6 +9,9 @@ class KittiVisualizer:
     def __init__(self):
         self.figure = mlab.figure(bgcolor=(0,0,0), fgcolor=(1,1,1), size=(1280, 720))
 
+    def show(self):
+        mlab.show(stop=True)
+
     def visualize(self, pointcloud, calib, objects, labels_objects=None):
         """
             Visualize the Scene including Point Cloud & 3D Boxes 
@@ -40,9 +43,9 @@ class KittiVisualizer:
         pointcloud = self.to_numpy(pointcloud)
         mlab.points3d(pointcloud[:,0], pointcloud[:,1], pointcloud[:,2], 
                     colormap='gnuplot', scale_factor=1, mode="point",  figure=self.figure)
-        self.visualize_axes()
+        self.draw_axes()
 
-    def visualize_axes(self):
+    def draw_axes(self):
         l = 4 # axis_length
         w = 1
         mlab.plot3d([0, l], [0, 0], [0, 0], color=(0, 0, 1), line_width=w, figure=self.figure) # x
@@ -51,9 +54,9 @@ class KittiVisualizer:
 
     def visualize_3d_bbox(self, bbox: BBox3D, color=(0,1,0)):
         corners = self.convert_3d_bbox_to_corners(bbox)
-        self.visualize_box_corners(corners, color)
+        self.draw_box_corners(corners, color)
 
-    def visualize_box_corners(self, corners, clr):
+    def draw_box_corners(self, corners, clr):
         if corners.shape[0] != 8:
             print("Invalid box format")
             return
@@ -111,21 +114,18 @@ class KittiVisualizer:
 
         # convert x, y, z from rectified cam coordinates to velodyne coordinates
         point = np.array([x, y, z]).reshape(1,3)
-        # point = self.calib.rectified_camera_to_velodyne(point)
+        point = self.calib.rectified_camera_to_velodyne(point)
 
-        x = point[0,0]
-        y = point[0,1]
-        z = point[0,2]
-
-        print(point)
-        print(x,y,z)
-        print("==========")
+        # convert (x,y,z) from center to top left corner
+        x = point[0,0] - w/2
+        y = point[0,1] - l/2
+        z = point[0,2] + h
 
         top_corners = np.array([
             [x, y, z],
-            [x+l, y, z],
-            [x, y+w, z],
-            [x+l, y+w, z]
+            [x+w, y, z],
+            [x, y+l, z],
+            [x+w, y+l, z]
         ])
 
         # same coordinates but z = z_top - box_height
@@ -148,7 +148,7 @@ class KittiVisualizer:
         ])
 
         # Translate the box to origin to perform rotation
-        center = np.array([x+l/2, y+w/2, 0])
+        center = np.array([x+w/2, y+l/2, 0])
         centered_corners = corners - center
 
         # Rotate
@@ -193,19 +193,14 @@ class KittiVisualizer:
 
 
 KITTI = KittiDataset()
-_, pointcloud, labels, calib = KITTI[7]
+_, pointcloud, labels, calib = KITTI[39]
 print(pointcloud.shape)
 
 visualizer = KittiVisualizer()
 visualizer.visualize(pointcloud, calib, labels)
-
-
-mlab.show(stop=True)
-
+visualizer.show()
 
  
-
-
 
 # # import open3d
 # class Open3dVisualizer:
