@@ -2,6 +2,8 @@ import numpy as np
 from math import sin, cos, radians
 from KittiDataset import KittiDataset
 from KittiUtils import *
+import BEVutils
+import cv2
 
 from torch import tensor
 from mayavi import mlab
@@ -39,6 +41,70 @@ class KittiVisualizer:
             for obj in labels:
                 self.visualize_3d_bbox(obj.bbox_3d, (1,0,0), calib)
 
+    def visualize_bev(self, pointcloud, objects, labels=None, calib=None):
+        BEV = BEVutils.pointcloud_to_bev(pointcloud)
+        BEV = self.bev_to_colored_bev(BEV)
+
+        # cv2.imshow("BEV0", BEV[:,:,0])
+        # cv2.imshow("BEV1", BEV[:,:,1])
+        # cv2.imshow("BEV2", BEV[:,:,2])
+        cv2.imshow("BEV", BEV)
+
+
+        # clip boxes
+        objects = BEVutils.clip_3d_boxes(objects,calib)
+        # labels = BEVutils.clip_3d_boxes(labels)
+        
+        # 3D Boxes of model output
+        for obj in objects:
+            color = self.get_box_color(obj.label)
+            self.draw_bev_box3d(BEV, obj.bbox_3d, color, calib)
+
+        # # 3D Boxes of dataset labels 
+        # if labels is not None:
+        #     for obj in labels:
+        #         self.visualize_3d_bbox(obj.bbox_3d, (1,0,0), calib)
+        #         self.draw_box_bev(BEV, obj.bbox_3d,)
+
+
+
+
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+        mlab.close()
+    
+    def draw_bev_box3d(self, bev, bbox_3d, color, calib):
+        corners = self.convert_3d_bbox_to_corners(bbox_3d, calib)
+        c0 = BEVutils.corner_to_bev_coord(corners[0] )
+        c1 = BEVutils.corner_to_bev_coord(corners[1] )
+        c2 = BEVutils.corner_to_bev_coord(corners[2] )
+        c3 = BEVutils.corner_to_bev_coord(corners[3] )
+
+        cv2.line(bev, (c0[0], c0[1]), (c1[0], c1[1]), color, 2)
+        cv2.line(bev, (c0[0], c0[1]), (c2[0], c2[1]), color, 2)
+        cv2.line(bev, (c3[0], c3[1]), (c1[0], c1[1]), color, 2)
+        cv2.line(bev, (c3[0], c3[1]), (c2[0], c2[1]), color, 2)
+
+
+        cv2.imshow("RRRR",bev)
+        cv2.waitKey(0)
+        return bev
+
+    def bev_to_colored_bev(self, bev):
+        intensity_map = bev[:,:,0] * 255
+        height_map = bev[:,:,1]
+        np.set_printoptions(threshold=np.inf)
+
+        minZ = BEVutils.boundary["minZ"]
+        maxZ = BEVutils.boundary["maxZ"]
+        height_map = 255 - 255 * (height_map - minZ) / (maxZ - minZ) 
+
+        # make empty points black in all channels
+        empty_points_indices = np.where(intensity_map == 0)
+        height_map[empty_points_indices] = 0
+
+        BEV = np.dstack((height_map, height_map, intensity_map))
+        return BEV
 
     def visuallize_pointcloud(self, pointcloud):
         pointcloud = self.to_numpy(pointcloud)
@@ -204,35 +270,43 @@ class KittiVisualizer:
 
 
 KITTI = KittiDataset()
-_, pointcloud, labels, calib = KITTI[37]
+_, pointcloud, labels, calib = KITTI[6]
 print(pointcloud.shape)
-
-pred = [{'pred_boxes': tensor([[19.4029,  0.4326, -0.6832,  3.2483,  1.6385,  1.5225,  6.3273],
-        [24.7294,  3.4589, -0.7314,  4.2589,  1.5571,  1.3714,  6.3081],
-        [ 0.1990,  7.8677, -0.9895,  3.6358,  1.5586,  1.4417,  6.0938],
-        [31.6080,  3.6406, -0.6025,  4.2100,  1.6102,  1.4592,  6.2861],
-        [38.6979,  3.6993, -0.5599,  3.6221,  1.5853,  1.5489,  6.2282],
-        [46.5156,  4.0235, -0.3655,  3.8081,  1.5840,  1.5392,  3.2865],
-        [55.6337, -2.2692, -0.2329,  3.6593,  1.6180,  1.5219,  6.2427],
-        [28.3043,  4.0533, -0.7925,  0.4021,  0.5918,  1.4803,  6.5827],
-        [40.4169, -1.7630, -0.3623,  4.1616,  1.5592,  1.5862,  3.2073],
-        [ 2.2620, -4.7594, -1.0531,  0.6414,  0.6154,  1.4674,  1.2008],
-        [25.2737, -1.4847, -0.6597,  1.5603,  0.3929,  1.5712,  6.2296],
-        [ 3.1774, -5.3730, -0.8268,  0.7852,  0.6185,  1.8156,  4.2028],
-        [17.1161,  4.7242, -0.9604,  4.2199,  1.6030,  1.3866,  2.9143]],
-       device='cuda:0'), 'pred_scores': tensor([0.9641, 0.7366, 0.5543, 0.4312, 0.2171, 0.2127, 0.1781, 0.1690, 0.1525,
-        0.1475, 0.1276, 0.1198, 0.1106], device='cuda:0'), 'pred_labels': tensor([1, 1, 1, 1, 1, 1, 1, 2, 1, 2, 3, 2, 1], device='cuda:0')}]
-
-objects = model_output_to_kitti_objects(pred)
-
 visualizer = KittiVisualizer()
-# visualizer.visualize(pointcloud, objects, labels, calib)
-visualizer.visualize(pointcloud, objects)
-# visualizer.visualize(pointcloud, labels, calib=calib)
 
-visualizer.show()
+# pred = [{'pred_boxes': tensor([[19.4029,  0.4326, -0.6832,  3.2483,  1.6385,  1.5225,  6.3273],
+#         [24.7294,  3.4589, -0.7314,  4.2589,  1.5571,  1.3714,  6.3081],
+#         [ 0.1990,  7.8677, -0.9895,  3.6358,  1.5586,  1.4417,  6.0938],
+#         [31.6080,  3.6406, -0.6025,  4.2100,  1.6102,  1.4592,  6.2861],
+#         [38.6979,  3.6993, -0.5599,  3.6221,  1.5853,  1.5489,  6.2282],
+#         [46.5156,  4.0235, -0.3655,  3.8081,  1.5840,  1.5392,  3.2865],
+#         [55.6337, -2.2692, -0.2329,  3.6593,  1.6180,  1.5219,  6.2427],
+#         [28.3043,  4.0533, -0.7925,  0.4021,  0.5918,  1.4803,  6.5827],
+#         [40.4169, -1.7630, -0.3623,  4.1616,  1.5592,  1.5862,  3.2073],
+#         [ 2.2620, -4.7594, -1.0531,  0.6414,  0.6154,  1.4674,  1.2008],
+#         [25.2737, -1.4847, -0.6597,  1.5603,  0.3929,  1.5712,  6.2296],
+#         [ 3.1774, -5.3730, -0.8268,  0.7852,  0.6185,  1.8156,  4.2028],
+#         [17.1161,  4.7242, -0.9604,  4.2199,  1.6030,  1.3866,  2.9143]],
+#        device='cuda:0'), 'pred_scores': tensor([0.9641, 0.7366, 0.5543, 0.4312, 0.2171, 0.2127, 0.1781, 0.1690, 0.1525,
+#         0.1475, 0.1276, 0.1198, 0.1106], device='cuda:0'), 'pred_labels': tensor([1, 1, 1, 1, 1, 1, 1, 2, 1, 2, 3, 2, 1], device='cuda:0')}]
+
+# objects = model_output_to_kitti_objects(pred)
+# visualizer.visualize(pointcloud, objects)
+# visualizer.visualize(pointcloud, objects, labels, calib)
+
+visualizer.visualize_bev(pointcloud, labels, calib=calib)
+# visualizer.show()
+
 
  
+
+
+
+
+
+
+
+
 
 # # import open3d
 # class Open3dVisualizer:
