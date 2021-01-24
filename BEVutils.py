@@ -36,7 +36,7 @@ descretization_x = BEV_HEIGHT / boundary["maxX"]
 descretization_y = BEV_WIDTH / (boundary["maxY"] - boundary["minY"])
 descretization_z = 1 / float(np.abs(boundary['maxZ'] - boundary['minZ']))
 
-# ======================================================================
+# =========================== BEV RGB Map ==================================
 
 def pointcloud_to_bev(pointcloud):
     pointcloud = clip_pointcloud(pointcloud)
@@ -83,7 +83,7 @@ def corner_to_bev_coord(corner):
     y_bev = np.int_((BEV_WIDTH/2) - corner[1] * descretization_y)
     return np.array([y_bev, x_bev])
 
-# ===================== Point Cloud Clipping =====================
+# ===================== Clipping =====================
 def clip_pointcloud(pointcloud):
 
     mask = np.where((pointcloud[:, 0] >= boundary["minX"]) & (pointcloud[:,0] <= boundary["maxX"]) &
@@ -97,28 +97,22 @@ def is_bbox_in_boundary(point):
     in_x = (point[0] >= boundary["minX"]) & (point[0] <= boundary["maxX"])  
     in_y = (point[1] >= boundary["minY"]) & (point[1] <= boundary["maxY"])
     in_z = (point[2] >= boundary["minZ"]) & (point[2] <= boundary["maxZ"])
-    print(in_z, point[2])
     return in_x & in_y & in_z    
 
 def clip_3d_boxes(objects, calib):
     cliped_objects = []
     for obj in objects:
         bbox= obj.bbox_3d
+
+        # check if point in Camera Coord. and convert it to LIDAR Coord.
         point = np.array([bbox.x, bbox.y, bbox.z]).reshape(1,3)
         if bbox.coordinates == Coordinates.CAM_3D_RECT:
-            point = calib.rectified_camera_to_velodyne(point)[0,0:3]
+            point = calib.rectified_camera_to_velodyne(point)[0,0:3] # reshape from homoginous
+
         point = point.reshape(3,1)
+
+        # if box center in the cliped region
         if is_bbox_in_boundary(point):
             cliped_objects.append(obj)
     return cliped_objects
 
-
-# a = np.array([[1, 1],
-#        [1, 3],
-#        [1, 4],
-#        [2, 1],
-#        [1, 1]
-#        ])
-
-# print(a.shape)
-# print(np.unique(a, axis=0))
